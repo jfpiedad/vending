@@ -1,0 +1,109 @@
+import json
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from websockets import ConnectionClosed
+
+from vending.detection_data import FinalDetectionResults
+from vending.enums import MessageType
+from vending.schemas import DetectionResults, Message
+from vending.services import store_transaction_in_db
+from vending.state import VendingState
+
+router = APIRouter()
+
+
+class ConnectionManager:
+    def __init__(self) -> None:
+        self.active_connection: WebSocket = None
+
+    async def connect(self, websocket: WebSocket) -> None:
+        if self.active_connection is not None:
+            raise HTTPException(status_code=403, detail="Duplicate")
+
+        await websocket.accept()
+        self.active_connection = websocket
+
+    def disconnect(self) -> None:
+        self.active_connection = None
+
+    async def send_data(self, data: str | dict[str, Any]) -> None:
+        if isinstance(data, dict):
+            await self.active_connection.send_json(data)
+        elif isinstance(data, str):
+            await self.active_connection.send_text(data)
+
+
+manager = ConnectionManager()
+
+
+@router.websocket("/ws/vending")
+async def vending(websocket: WebSocket) -> Any:
+    await manager.connect(websocket=websocket)
+
+    try:
+        while True:
+            # Wait signal from client to begin detection pipeline.
+            if not VendingState.started:
+                data = await websocket.receive_text()
+                VendingState.started = True
+
+            # Initial message at the start of vending process which is waiting for a user.
+            message = Message(message="No User.", message_type=MessageType.INITIAL)
+            await manager.send_data(message.model_dump(by_alias=True))
+
+            # Waiting until a user is detected.
+            await VendingState.ready_choosing.wait()
+
+            if VendingState.is_terminated:
+                raise WebSocketDisconnect()
+
+            detection_data = DetectionResults(
+                age=FinalDetectionResults.age,
+                age_group=FinalDetectionResults.age_group,
+                weather=FinalDetectionResults.weather,
+                suggested_drinks=FinalDetectionResults.suggested_drinks,
+            )
+
+            # Send the detection results data
+            message = Message(
+                message=detection_data, message_type=MessageType.DETECTION_DATA
+            )
+            await manager.send_data(message.model_dump(by_alias=True))
+
+            # Wait for the user to choose a drink.
+            # Tries to parse the received data as json. If it fails parsing, it means the user chose
+            # to cancel, if it successfully parses, it means the user chose a drink.
+            try:
+                data = await websocket.receive_json()
+
+                message = Message(
+                    message=f"Processing {data['drinkBought']}...",
+                    message_type=MessageType.PROCESSING_DRINK,
+                )
+                await manager.send_data(message.model_dump(by_alias=True))
+
+                db = websocket.state.db
+                await store_transaction_in_db(db=db, transaction_data=data)
+
+                # Send a message after transaction is saved in the database.
+                message = Message(
+                    message=f"{data['drinkBought']} is done preparing.",
+                    message_type=MessageType.DRINK_READY,
+                )
+                await manager.send_data(message.model_dump(by_alias=True))
+
+                # Waiting for the user to confirm and go back to initial state.
+                await websocket.receive_text()
+            except json.JSONDecodeError:
+                pass
+
+            # Trigger a flag to go back to initial state.
+            VendingState.ready_choosing.clear()
+    except (WebSocketDisconnect, ConnectionClosed):
+        print("Websocket connection disconnected.")
+        VendingState.started = False
+        VendingState.is_terminated = False
+        VendingState.ready_choosing.clear()
+
+        manager.disconnect()

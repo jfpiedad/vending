@@ -1,0 +1,64 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background-color: #252627;
+}
+
+.container {
+  display: flex;
+  height: 100vh;
+  gap: 40px;
+  padding: 40px;
+  box-sizing: border-box;
+}
+
+.left,
+.right {
+  flex: 1;
+  background-color: #1d1b1b;
+}
+
+.left img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.right,
+.vending {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.vending > span {
+  padding: 20px;
+}
+
+.buy {
+  margin-right: 20px;
+}
+
+span {
+  font-size: 30px;
+  font-family: Helvetica, Arial, sans-serif;
+  color: aliceblue;
+}
+
+input[type="button"] {
+  width: 150px;
+  height: 40px;
+  font-size: 20px;
+}
+
+input[type="button"]:hover {
+  background-color: cornflowerblue;
+}
+
+label {
+  color: aliceblue;
+  font-size: 30px;
+}

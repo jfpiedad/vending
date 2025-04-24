@@ -1,0 +1,18 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# User-generated files
+datasets/
+results/
+datasets/
+random_samples/
+*.env
+weights/

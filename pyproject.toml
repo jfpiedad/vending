@@ -1,0 +1,30 @@
+[project]
+name = "vending"
+version = "0.1.0"
+description = "Image Processing-Based Vending Machine"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "albumentations>=2.0.5",
+    "cachetools>=5.5.2",
+    "fastapi[standard]>=0.115.12",
+    "imgaug>=0.4.0",
+    "mediapipe>=0.10.21",
+    "motor>=3.7.0",
+    "onnx>=1.17.0",
+    "onnx-tf>=1.6.0",
+    "opencv-python>=4.11.0.86",
+    "pandas>=2.2.3",
+    "pydantic-settings>=2.8.1",
+    "tensorflow>=2.18.1",
+    "torch>=2.6.0",
+    "torchvision>=0.21.0",
+    "tqdm>=4.67.1",
+]
+
+[project.scripts]
+vending = "vending:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
