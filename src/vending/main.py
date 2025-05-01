@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from vending.core import run_detection_livestream
+from vending.core.full_system import run_detection_livestream
 from vending.database import initialize_db
 from vending.schemas import Transaction
 from vending.services import get_all_transactions_in_db

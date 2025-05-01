@@ -14,6 +14,7 @@ from torchvision import transforms as T
 
 from vending.age_estimation.agenet import Model
 from vending.face_detection.detect import initialize_face_detector
+from vending.services import get_current_weather
 
 
 class AgeEstimator:
@@ -79,6 +80,23 @@ class AgeEstimator:
         """Apply padding to bounding box."""
         return [box[0] - padding, box[1] - padding, box[2] + padding, box[3] + padding]
 
+    def predict_no_weather(self, bounding_box, frame) -> int:
+        age = self.predict_frame(bounding_box, frame)
+        print(
+            f"\r\033[KFace detected, bounding_box = {bounding_box} | {age} years old",
+            end="",
+            flush=True,
+        )
+
+    def predict_with_weather(self, bounding_box, frame) -> int:
+        age = self.predict_frame(bounding_box, frame)
+        weather = get_current_weather()
+        print(
+            f"\r\033[KFace detected, bounding_box = {bounding_box} | {age} years old | Weather: {weather}",
+            end="",
+            flush=True,
+        )
+
     def predict_frame(self, bounding_box, frame) -> int:
         """Process a single video frame for real-time predictions."""
         bboxes = []
@@ -117,9 +135,7 @@ class AgeEstimator:
 
         for i, box in enumerate(bboxes):
             box = np.clip(box, 0, np.inf).astype(np.uint32)
-            label = f" {ages[i].item()} years old"
             age = ages[i].item()
-            print(label)
 
         return age
 
