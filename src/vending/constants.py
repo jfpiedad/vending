@@ -1,3 +1,5 @@
+from vending.age_estimation.detect import AgeEstimator
+
 VENDING_DRINKS = {
     "child": {
         "hot": "juice, flavored milk",
@@ -20,3 +22,6 @@ VENDING_DRINKS = {
         "moderate": "green tea, fruit juice",
     },
 }
+
+
+AGE_DETECTOR = AgeEstimator()

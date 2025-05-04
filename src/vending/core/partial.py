@@ -10,12 +10,9 @@ from mediapipe.tasks.python.vision.core.vision_task_running_mode import (
     VisionTaskRunningMode,
 )
 
-from vending.age_estimation.detect import AgeEstimator
-from vending.core.utils import annotate_image_with_bounding_box
+from vending.constants import AGE_DETECTOR
+from vending.core.utils import annotate_image_with_bounding_box, sort_detection_results
 from vending.face_detection.detect import initialize_face_detector
-
-AGE_DETECTOR = AgeEstimator()
-
 
 executor = ThreadPoolExecutor()
 _process: Future = None
@@ -61,6 +58,9 @@ def face_detection_callback(
     global annotated_image
 
     if detection_result.detections:
+        if len(detection_result.detections) > 1:
+            sort_detection_results(detection_result=detection_result)
+
         bounding_box = detection_result.detections[0].bounding_box
         print(
             f"\r\033[KFace detected, bounding_box = {bounding_box}", end="", flush=True
@@ -80,6 +80,9 @@ def age_estimation_callback(
     global _process
 
     if detection_result.detections:
+        if len(detection_result.detections) > 1:
+            sort_detection_results(detection_result=detection_result)
+
         bounding_box = detection_result.detections[0].bounding_box
 
         annotated_image = annotate_image_with_bounding_box(
@@ -103,6 +106,9 @@ def weather_callback(
     global _process
 
     if detection_result.detections:
+        if len(detection_result.detections) > 1:
+            sort_detection_results(detection_result=detection_result)
+
         bounding_box = detection_result.detections[0].bounding_box
 
         annotated_image = annotate_image_with_bounding_box(

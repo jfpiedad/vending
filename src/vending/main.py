@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,6 +10,7 @@ from vending.core.full_system import run_detection_livestream
 from vending.database import initialize_db
 from vending.schemas import Transaction
 from vending.services import get_all_transactions_in_db
+from vending.state import VendingState
 from vending.websocket import router as websocket_router
 
 app = FastAPI(
@@ -33,8 +34,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates("static")
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/vending", response_class=HTMLResponse)
 def vending(request: Request) -> Any:
+    if VendingState.currently_on:
+        raise HTTPException(status_code=409, detail="Vending is already open.")
+
     return templates.TemplateResponse(request=request, name="index.html")
 
 

@@ -15,7 +15,9 @@ class Weather(StrEnum):
 
 
 class MessageType(IntEnum):
+    ALERT_MESSAGE = 0
     INITIAL = 1
-    DETECTION_DATA = 2
-    PROCESSING_DRINK = 3
-    DRINK_READY = 4
+    PROCESSING_USER = 2
+    DETECTION_DATA = 3
+    PROCESSING_DRINK = 4
+    DRINK_READY = 5

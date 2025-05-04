@@ -5,8 +5,8 @@ const webSocket = new WebSocket("/ws/vending");
 const container = document.querySelector(".right");
 
 webSocket.addEventListener("open", () => {
-  console.log("Start");
   webSocket.send("Start");
+  console.log("Start");
 });
 
 webSocket.addEventListener("close", () => {
@@ -23,12 +23,26 @@ webSocket.addEventListener("message", (event) => {
 
   let data = JSON.parse(event.data);
 
-  if (data.messageType == 1) {
+  if (data.messageType == 0) {
+    console.log(data.message);
+    alert(data.message);
+  } else if (data.messageType == 1) {
+    const btnOrder = document.createElement("input");
+    btnOrder.type = "button";
+    btnOrder.value = "ORDER";
+    btnOrder.className = "order";
+
+    btnOrder.addEventListener("click", () => {
+      webSocket.send("Order");
+    });
+
+    vending.appendChild(btnOrder);
+  } else if (data.messageType == 2) {
     const span = document.createElement("span");
     span.textContent = data.message;
 
     vending.appendChild(span);
-  } else if (data.messageType == 2) {
+  } else if (data.messageType == 3) {
     takeDrink.style.display = "none";
     buyOrCancel.style.diisplay = "block";
 
@@ -100,12 +114,12 @@ webSocket.addEventListener("message", (event) => {
     buyOrCancel.appendChild(btnCancel);
 
     vending.appendChild(buyOrCancel);
-  } else if (data.messageType == 3) {
+  } else if (data.messageType == 4) {
     const span = document.createElement("span");
     span.textContent = data.message;
 
     vending.appendChild(span);
-  } else if (data.messageType == 4) {
+  } else if (data.messageType == 5) {
     const span = document.createElement("span");
     span.textContent = data.message;
 

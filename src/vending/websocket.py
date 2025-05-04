@@ -44,18 +44,49 @@ async def vending(websocket: WebSocket) -> Any:
     try:
         while True:
             # Wait signal from client to begin detection pipeline.
-            if not VendingState.started:
-                data = await websocket.receive_text()
-                VendingState.started = True
+            if not VendingState.currently_on:
+                await websocket.receive_text()
+                VendingState.currently_on = True
 
-            # Initial message at the start of vending process which is waiting for a user.
-            message = Message(message="No User.", message_type=MessageType.INITIAL)
+            # Initial message at the start of vending process.
+            message = Message(message="", message_type=MessageType.INITIAL)
             await manager.send_data(message.model_dump(by_alias=True))
 
-            # Waiting until a user is detected.
-            await VendingState.ready_choosing.wait()
+            # Wait until user decides to order.
+            await websocket.receive_text()
+            VendingState.currently_ordering = True
 
-            if VendingState.is_terminated:
+            # Edge Case: Order button is clicked but there is no user in front of the camera.
+            # Return to initial state if there are no frames to be processed since there is no user.
+            if VendingState.frames_count() < 10:
+                VendingState.currently_ordering = False
+                message = Message(
+                    message="No user in front of the camera.",
+                    message_type=MessageType.ALERT_MESSAGE,
+                )
+                await manager.send_data(message.model_dump(by_alias=True))
+                continue
+
+            # Wait until system is done processing user.
+            message = Message(
+                message="Processing user...", message_type=MessageType.PROCESSING_USER
+            )
+            await manager.send_data(message.model_dump(by_alias=True))
+
+            # Wait until the system is finished processing the user.
+            await VendingState.ready_to_vend.wait()
+
+            if not VendingState.currently_ordering:
+                # Reset back to initial state.
+                VendingState.reset()
+                message = Message(
+                    message="No user in front of the camera.",
+                    message_type=MessageType.ALERT_MESSAGE,
+                )
+                await manager.send_data(message.model_dump(by_alias=True))
+                continue
+
+            if not VendingState.currently_on:
                 raise WebSocketDisconnect()
 
             detection_data = DetectionResults(
@@ -98,12 +129,9 @@ async def vending(websocket: WebSocket) -> Any:
             except json.JSONDecodeError:
                 pass
 
-            # Trigger a flag to go back to initial state.
-            VendingState.ready_choosing.clear()
+            # Reset back to initial state.
+            VendingState.reset()
     except (WebSocketDisconnect, ConnectionClosed):
         print("Websocket connection disconnected.")
-        VendingState.started = False
-        VendingState.is_terminated = False
-        VendingState.ready_choosing.clear()
-
+        VendingState.reset()
         manager.disconnect()

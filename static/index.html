@@ -10,7 +10,11 @@
   <body>
     <div class="container">
       <div class="left">
-        <img src="http://127.0.0.1:8000/camera-frames" alt="Live Video Feed" />
+        <img
+          src="http://127.0.0.1:8000/camera-frames"
+          alt="Live Video Feed"
+          onerror="this.src='./ff7.webp';"
+        />
       </div>
       <div class="right"></div>
     </div>

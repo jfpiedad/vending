@@ -1,3 +1,4 @@
+import math
 import time
 from typing import AsyncGenerator
 
@@ -10,25 +11,19 @@ from mediapipe.tasks.python.vision.core.vision_task_running_mode import (
     VisionTaskRunningMode,
 )
 
-from vending.age_estimation.detect import AgeEstimator
-from vending.constants import VENDING_DRINKS
-from vending.core.utils import annotate_image_with_bounding_box
+from vending.constants import AGE_DETECTOR, VENDING_DRINKS
+from vending.core.utils import annotate_image_with_bounding_box, sort_detection_results
 from vending.detection_data import FinalDetectionResults
 from vending.enums import AgeGroup
 from vending.face_detection.detect import initialize_face_detector
 from vending.services import get_current_weather
 from vending.state import VendingState
 
-AGE_DETECTOR = AgeEstimator()
-
 annotated_image = None
 
 
 async def run_detection_livestream(request: Request) -> AsyncGenerator[bytes, None]:
     global annotated_image
-
-    if VendingState.started:
-        return
 
     video_feed = cv2.VideoCapture(0)
 
@@ -43,20 +38,19 @@ async def run_detection_livestream(request: Request) -> AsyncGenerator[bytes, No
             while True:
                 if await request.is_disconnected():
                     break
-
                 success, frame = video_feed.read()
 
                 if not success:
                     continue
 
-                timestamp_ms = video_feed.get(cv2.CAP_PROP_POS_MSEC)
+                timestamp_ms = int(video_feed.get(cv2.CAP_PROP_POS_MSEC))
 
                 image = mediapipe.Image(
                     image_format=mediapipe.ImageFormat.SRGB, data=frame
                 )
 
-                if VendingState.started and not VendingState.currently_vending:
-                    detector.detect_async(image, timestamp_ms=int(timestamp_ms))
+                if not VendingState.processing_frames:
+                    detector.detect_async(image, timestamp_ms=timestamp_ms)
                 else:
                     annotated_image = frame
 
@@ -75,11 +69,11 @@ async def run_detection_livestream(request: Request) -> AsyncGenerator[bytes, No
                     )
     finally:
         print("Vending Machine is turned off.")
-        VendingState.is_terminated = True
+        VendingState.currently_on = False
 
         # Trigger a flag when the browser tab is closed to signal that vending is turned off
         # and not wait for a user anymore which will properly close the websocket connection.
-        VendingState.ready_choosing.set()
+        VendingState.ready_to_vend.set()
 
         video_feed.release()
         cv2.destroyAllWindows()
@@ -91,15 +85,21 @@ def livestream_detection_callback(
     global annotated_image
 
     if detection_result.detections:
+        VendingState.last_face_detected_timestamp = timestamp_ms
+
+        # Sort detection results
+        if len(detection_result.detections) > 1:
+            sort_detection_results(detection_result=detection_result)
+
         annotated_image = annotate_image_with_bounding_box(
             output_image.numpy_view(), detection_result
         )
 
-        if VendingState.number_of_frames >= 10:
-            VendingState.currently_vending = True
+        if VendingState.currently_ordering and VendingState.frames_count() >= 10:
+            VendingState.processing_frames = True
             ages = []
 
-            for result, image, _ in VendingState.detection_data:
+            for result, image, _ in VendingState.recent_frames:
                 bounding_box = result.detections[0].bounding_box
                 image_copy = np.copy(image.numpy_view())
 
@@ -109,27 +109,41 @@ def livestream_detection_callback(
 
             # Processing frames are done and results are ready.
             # User can now choose a drink from the vending machine
-            VendingState.ready_choosing.set()
+            VendingState.ready_to_vend.set()
 
             # Wait until the user has chosen a drink or decided to cancel
-            while (
-                VendingState.ready_choosing.is_set() and not VendingState.is_terminated
-            ):
+            while VendingState.ready_to_vend.is_set() and VendingState.currently_on:
                 time.sleep(0.5)
 
-            VendingState.number_of_frames = 0
-            VendingState.clear_detection_data()
-            VendingState.currently_vending = False
+            VendingState.currently_ordering = False
+            VendingState.processing_frames = False
+        elif VendingState.currently_ordering and VendingState.frames_count < 10:
+            VendingState.currently_ordering = False
+            VendingState.ready_to_vend.set()
         else:
-            if VendingState.number_of_frames < 10:
-                VendingState.add_frame(detection_result, output_image, timestamp_ms)
-                VendingState.number_of_frames += 1
+            VendingState.add_frame(detection_result, output_image, timestamp_ms)
     else:
         annotated_image = output_image.numpy_view()
 
+        if VendingState.currently_ordering:
+            VendingState.currently_ordering = False
+            VendingState.ready_to_vend.set()
+
 
 def process_results(ages: list[int]) -> None:
-    age = int(sum(ages) / len(ages))
+    ages.sort()
+
+    length = len(ages)
+    trim_ratio = 0.2
+
+    trim_length = math.floor(length * trim_ratio)
+
+    if 2 * trim_length >= length:
+        raise ValueError(f"Trim ratio too large for a list of length {length}")
+
+    trimmed_ages_list = ages[trim_length : length - trim_length]
+
+    age = round(np.mean(trimmed_ages_list))
 
     if age < 13:
         age_group = AgeGroup.CHILD
