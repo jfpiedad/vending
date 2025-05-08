@@ -14,5 +14,5 @@ class FaceModelParameters:
     image_size: int = 128
     detection_threshold: float = 0.5
     blazeface_channels: int = 32
-    model_path: str = "weights/blazeface123.pt"
+    model_path: str = "weights/blazeface.pt"
     augmentation: dict | None = None

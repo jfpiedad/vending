@@ -1,5 +1,6 @@
 import os
 from glob import glob
+from typing import Any
 
 import albumentations as A
 import cv2
@@ -11,7 +12,9 @@ from torchvision import transforms
 
 
 class OpenImagesV7Dataset(torch.utils.data.Dataset):
-    def __init__(self, labels_path: str, image_size: int, augment: A.Compose = None):
+    def __init__(
+        self, labels_path: str, image_size: int, augment: A.Compose = None
+    ) -> None:
         """Initialize the Dataset for BlazeFace. We are going to use a subset of the Open Images V7 by Google.
 
         Args:
@@ -114,7 +117,7 @@ class OpenImagesV7Dataset(torch.utils.data.Dataset):
         return target
 
     @staticmethod
-    def resize_and_pad(img: np.ndarray, target_size: int = 128) -> dict:
+    def resize_and_pad(img: np.ndarray, target_size: int = 128) -> dict[str, Any]:
         """Resize image to square target_size, and pad if needed to avoid deformation.
 
         Args:

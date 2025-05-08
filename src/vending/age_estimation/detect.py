@@ -42,7 +42,7 @@ class AgeEstimator:
             print(f"Weights loaded successfully from path: {weights}")
             print("=" * 60)
 
-    def transform(self, image):
+    def transform(self, image: Image) -> torch.Tensor:
         """Transform input face image for the model."""
         return T.Compose(
             [
@@ -52,35 +52,11 @@ class AgeEstimator:
             ]
         )(image)
 
-    @staticmethod
-    def plot_box_and_label(
-        image, lw, box, label="", color=(128, 128, 128), txt_color=(255, 255, 255)
-    ):
-        """Add a labeled bounding box to the image."""
-        p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
-        cv.rectangle(image, p1, p2, color, thickness=lw, lineType=cv.LINE_AA)
-        if label:
-            tf = max(lw - 1, 1)
-            w, h = cv.getTextSize(label, 0, fontScale=lw / 3, thickness=tf)[0]
-            outside = p1[1] - h - 3 >= 0
-            p2 = p1[0] + w, p1[1] - h - 3 if outside else p1[1] + h + 3
-            cv.rectangle(image, p1, p2, color, -1, cv.LINE_AA)
-            cv.putText(
-                image,
-                label,
-                (p1[0], p1[1] - 2 if outside else p1[1] + h + 2),
-                0,
-                lw / 3,
-                txt_color,
-                thickness=tf,
-                lineType=cv.LINE_AA,
-            )
-
-    def padding_face(self, box, padding=10):
+    def padding_face(self, box: list[int], padding: int = 10) -> list[int]:
         """Apply padding to bounding box."""
         return [box[0] - padding, box[1] - padding, box[2] + padding, box[3] + padding]
 
-    def predict_no_weather(self, bounding_box, frame) -> int:
+    def predict_no_weather(self, bounding_box: list[int], frame: np.ndarray) -> None:
         age = self.predict_frame(bounding_box, frame)
         print(
             f"\r\033[KFace detected, bounding_box = {bounding_box} | {age} years old",
@@ -88,7 +64,7 @@ class AgeEstimator:
             flush=True,
         )
 
-    def predict_with_weather(self, bounding_box, frame) -> int:
+    def predict_with_weather(self, bounding_box: list[int], frame: np.ndarray) -> None:
         age = self.predict_frame(bounding_box, frame)
         weather = get_current_weather()
         print(
@@ -97,7 +73,7 @@ class AgeEstimator:
             flush=True,
         )
 
-    def predict_frame(self, bounding_box, frame) -> int:
+    def predict_frame(self, bounding_box: list[int], frame: np.ndarray) -> int:
         """Process a single video frame for real-time predictions."""
         bboxes = []
 
@@ -116,13 +92,17 @@ class AgeEstimator:
             return ndarray_image
 
         face_images = []
+
         for box in bboxes:
             box = np.clip(box, 0, np.inf).astype(np.uint32)
+
             padding = max(ndarray_image.shape) * 5 / self.thickness_per_pixels
             padding = int(max(padding, 10))
+
             box = self.padding_face(box, padding)
             face = image.crop(box)
             transformed_face = self.transform(face)
+
             face_images.append(transformed_face)
 
         if not face_images:
@@ -133,13 +113,13 @@ class AgeEstimator:
         genders = torch.round(genders)
         ages = torch.round(ages).long()
 
-        for i, box in enumerate(bboxes):
+        for index, box in enumerate(bboxes):
             box = np.clip(box, 0, np.inf).astype(np.uint32)
-            age = ages[i].item()
+            age = ages[index].item()
 
         return age
 
-    def predict(self, img_path, min_prob=0.9):
+    def predict(self, img_path: str) -> int:
         """Process an image file for predictions."""
         test_feed = cv.VideoCapture(img_path)
 
@@ -203,28 +183,20 @@ class AgeEstimator:
         genders = torch.round(genders)
         ages = torch.round(ages).long()
 
-        for i, box in enumerate(bboxes):
+        for index, box in enumerate(bboxes):
             box = np.clip(box, 0, np.inf).astype(np.uint32)
-            thickness = max(image_shape) // 400
-            thickness = int(max(np.ceil(thickness), 1))
-            label = (
-                f"{'Man' if genders[i] == 0 else 'Woman'}: {ages[i].item()} years old"
-            )
-            print(label)
-            self.plot_box_and_label(
-                ndarray_image, thickness, box, label, color=(255, 0, 0)
-            )
+            age = ages[index].item()
 
-        return ndarray_image
+        return age
 
 
 def main(
-    image_path,
-    weights="weights/agenet.pt",
-    face_size=64,
-    device="cpu",
-    save_result=False,
-):
+    image_path: str,
+    weights: str = "weights/agenet.pt",
+    face_size: int = 64,
+    device: str = "cpu",
+    save_result: int = False,
+) -> None:
     print(f"Processing image: {image_path}")
     model = AgeEstimator(weights=weights, face_size=face_size, device=device)
     predicted_image = model.predict_frame()

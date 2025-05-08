@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 from pathlib import Path
+from typing import Any
 
 import albumentations as A
 import torch
@@ -15,7 +16,7 @@ from vending.face_detection.utils import MultiBoxLoss, od_collate_fn
 
 def train_model(
     net: torch.nn.Module,
-    dataloaders_dict: dict,
+    dataloaders_dict: dict[str, Any],
     criterion: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler._LRScheduler,

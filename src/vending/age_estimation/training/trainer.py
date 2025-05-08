@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from vending.age_estimation.agenet import (
@@ -16,13 +17,13 @@ from vending.age_estimation.training.specifications import AgeModelParameters
 
 
 def evaluate(
-    gender_model,
-    age_range_model,
-    age_estimation_model,
-    val_dataloader,
-    device="cpu",
-    verbose=0,
-):
+    gender_model: nn.Module,
+    age_range_model: nn.Module,
+    age_estimation_model: nn.Module,
+    val_dataloader: DataLoader,
+    device: str = "cpu",
+    verbose: int = 0,
+) -> tuple[float, float, float, float, float]:
     # set device
     if isinstance(device, str):
         if (device == "cuda" or device == "gpu") and torch.cuda.is_available():
@@ -109,7 +110,7 @@ def train(
     steps_per_epoch: int | None = None,
     val_data_dir: str | None = None,
     validation_split: int | None = None,
-):
+) -> None:
     # get train_loader
     train_data = get_dataloader(
         train_data_dir, image_size=image_size, batch_size=batch_size
